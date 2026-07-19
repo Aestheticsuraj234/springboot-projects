@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: lovable-postgres
+    environment:
+      POSTGRES_DB: lovable
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - lovable_pg_data:/var/lib/postgresql/data
+
+volumes:
+  lovable_pg_data:
