@@ -18,6 +18,7 @@ This repo contains:
 | Node.js | 20+ |
 | Docker Desktop | Latest |
 | OpenAI API key | Required for AI chat |
+| Daytona API key | Optional — enables live cloud sandbox previews |
 
 ---
 
@@ -48,6 +49,16 @@ $env:DATABASE_USERNAME="postgres"
 $env:DATABASE_PASSWORD="postgres"
 $env:CORS_ALLOWED_ORIGINS="http://localhost:5173"
 $env:JWT_SECRET="your-super-secret-key-at-least-32-characters-long"
+```
+
+Daytona live previews (optional, recommended):
+
+```powershell
+$env:DAYTONA_ENABLED="true"
+$env:DAYTONA_API_KEY="your-daytona-api-key"
+$env:DAYTONA_TARGET="us"
+# Optional: use a prebuilt snapshot with Node/Vite for faster sandbox startup
+# $env:DAYTONA_SNAPSHOT="your-snapshot-name-or-id"
 ```
 
 Optional:
@@ -107,7 +118,8 @@ The Vite dev server proxies `/api/*` to `http://localhost:8080`.
 3. Create a project from the dashboard
 4. Open the workspace
 5. Chat with AI — responses stream in real time
-6. Click **Save preview** on an assistant message to extract code blocks into a live Sandpack preview
+6. The backend extracts generated files and deploys them to a **Daytona sandbox** (if configured) or **Sandpack** fallback
+7. Open the **Demo** tab to see the live preview iframe
 
 ---
 

@@ -20,20 +20,23 @@ public class MessageService {
 
     private final MessageRepository messageRepository;
     private final ProjectService projectService;
+    private final FragmentService fragmentService;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<MessageResponse> listMessages(String projectId) {
         projectService.verifyProjectOwnership(projectId);
         return messageRepository.findByProjectIdOrderByCreatedAtAsc(projectId).stream()
+                .peek(fragmentService::repairFragmentIfNeeded)
                 .map(MessageResponse::from)
                 .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public MessageResponse getMessage(String projectId, String messageId) {
         projectService.verifyProjectOwnership(projectId);
         Message message = messageRepository.findByIdAndProjectId(messageId, projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
+        fragmentService.repairFragmentIfNeeded(message);
         return MessageResponse.from(message);
     }
 

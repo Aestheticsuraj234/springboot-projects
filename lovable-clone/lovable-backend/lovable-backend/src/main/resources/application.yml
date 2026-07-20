@@ -33,3 +33,12 @@ lovable:
     secret: ${JWT_SECRET:change-this-secret-in-production-use-at-least-32-characters}
     access-token-expiration-minutes: ${JWT_ACCESS_EXPIRATION_MINUTES:15}
     refresh-token-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS:7}
+  daytona:
+    enabled: ${DAYTONA_ENABLED:false}
+    api-key: ${DAYTONA_API_KEY:}
+    api-url: ${DAYTONA_API_URL:https://app.daytona.io/api}
+    target: ${DAYTONA_TARGET:us}
+    snapshot: ${DAYTONA_SNAPSHOT:}
+    preview-port: ${DAYTONA_PREVIEW_PORT:5173}
+    preview-expiry-seconds: ${DAYTONA_PREVIEW_EXPIRY_SECONDS:3600}
+    command-timeout-seconds: ${DAYTONA_COMMAND_TIMEOUT_SECONDS:300}

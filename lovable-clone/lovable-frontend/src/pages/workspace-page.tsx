@@ -1,83 +1,95 @@
-import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { useParams } from 'react-router-dom'
+import { Code, Eye } from 'lucide-react'
 import { AppShell } from '@/components/app-shell'
 import { ChatPanel } from '@/components/chat-panel'
 import { FileExplorer } from '@/components/file-explorer'
-import { CodeEditorPanel } from '@/components/code-editor-panel'
 import { PreviewPanel } from '@/components/preview-panel'
+import { ProjectHeader } from '@/components/project-header'
 import { Button } from '@/components/ui/button'
-import { useMessages, useProject } from '@/hooks/use-api'
+import { useMessages } from '@/hooks/use-api'
+import type { Fragment } from '@/types/api'
 
 export function WorkspacePage() {
   const { projectId = '' } = useParams()
-  const { data: project } = useProject(projectId)
   const { data: messages = [] } = useMessages(projectId)
-  const [selectedFile, setSelectedFile] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'editor' | 'preview'>('preview')
+  const [activeFragment, setActiveFragment] = useState<Fragment | null>(null)
+  const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview')
+  const lastAssistantMessageIdRef = useRef<string | null>(null)
 
-  const latestFragment = useMemo(() => {
-    const withFragments = messages.filter((message) => message.fragment)
-    return withFragments.at(-1)?.fragment ?? null
+  useEffect(() => {
+    const lastAssistantWithFragment = [...messages]
+      .reverse()
+      .find((message) => message.role === 'ASSISTANT' && message.fragment)
+
+    if (
+      lastAssistantWithFragment?.fragment &&
+      lastAssistantWithFragment.id !== lastAssistantMessageIdRef.current
+    ) {
+      setActiveFragment(lastAssistantWithFragment.fragment)
+      setActiveTab('preview')
+      lastAssistantMessageIdRef.current = lastAssistantWithFragment.id
+    }
   }, [messages])
-
-  const files = latestFragment ? Object.keys(latestFragment.files ?? {}) : []
-  const currentFile = selectedFile ?? files[0] ?? null
 
   return (
     <AppShell>
-      <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
-          <div className="flex items-center gap-3">
-            <Link to="/dashboard">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="h-4 w-4" />
-                Back
+      <div className="flex h-full overflow-hidden">
+        <section className="flex w-[min(100%,420px)] min-w-[320px] flex-col border-r border-[var(--color-border)]">
+          <ProjectHeader projectId={projectId} />
+          <ChatPanel
+            projectId={projectId}
+            activeFragment={activeFragment}
+            onFragmentSelect={(fragment) => {
+              setActiveFragment(fragment)
+              setActiveTab('preview')
+            }}
+            onPreviewReady={() => setActiveTab('preview')}
+          />
+        </section>
+
+        <section className="flex min-w-0 flex-1 flex-col">
+          <div className="flex items-center gap-2 border-b border-[var(--color-border)] p-2">
+            <div className="inline-flex rounded-md border border-[var(--color-border)] p-0.5">
+              <Button
+                size="sm"
+                variant={activeTab === 'preview' ? 'secondary' : 'ghost'}
+                className="gap-2"
+                onClick={() => setActiveTab('preview')}
+              >
+                <Eye className="h-4 w-4" />
+                Demo
               </Button>
-            </Link>
-            <div>
-              <p className="text-sm font-medium">{project?.name ?? 'Workspace'}</p>
-              <p className="text-xs text-[var(--color-muted-foreground)]">Project ID: {projectId}</p>
+              <Button
+                size="sm"
+                variant={activeTab === 'code' ? 'secondary' : 'ghost'}
+                className="gap-2"
+                onClick={() => setActiveTab('code')}
+              >
+                <Code className="h-4 w-4" />
+                Code
+              </Button>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant={activeTab === 'editor' ? 'secondary' : 'ghost'}
-              onClick={() => setActiveTab('editor')}
-            >
-              Editor
-            </Button>
-            <Button
-              size="sm"
-              variant={activeTab === 'preview' ? 'secondary' : 'ghost'}
-              onClick={() => setActiveTab('preview')}
-            >
-              Preview
-            </Button>
-          </div>
-        </div>
 
-        <div className="grid flex-1 overflow-hidden lg:grid-cols-[280px_minmax(0,1fr)_360px] xl:grid-cols-[280px_minmax(0,1fr)_420px]">
-          <FileExplorer
-            fragment={latestFragment}
-            selectedFile={currentFile}
-            onSelectFile={(path) => {
-              setSelectedFile(path)
-              setActiveTab('editor')
-            }}
-          />
-
-          <div className="min-w-0 border-r border-[var(--color-border)]">
-            {activeTab === 'editor' ? (
-              <CodeEditorPanel fragment={latestFragment} selectedFile={currentFile} />
+          <div className="min-h-0 flex-1 overflow-hidden">
+            {activeTab === 'preview' ? (
+              activeFragment ? (
+                <PreviewPanel fragment={activeFragment} />
+              ) : (
+                <div className="flex h-full items-center justify-center text-sm text-[var(--color-muted-foreground)]">
+                  Your live preview will appear here after the AI generates code.
+                </div>
+              )
+            ) : activeFragment ? (
+              <FileExplorer fragment={activeFragment} />
             ) : (
-              <PreviewPanel fragment={latestFragment} />
+              <div className="flex h-full items-center justify-center text-sm text-[var(--color-muted-foreground)]">
+                Select a preview from the chat to browse generated files.
+              </div>
             )}
           </div>
-
-          <ChatPanel projectId={projectId} />
-        </div>
+        </section>
       </div>
     </AppShell>
   )

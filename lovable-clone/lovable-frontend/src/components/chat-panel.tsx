@@ -1,30 +1,44 @@
-import { useMemo, useState } from 'react'
-import { Loader2, Send, Sparkles, Save } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Loader2, Send } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Badge } from '@/components/ui/badge'
+import { MessageCard } from '@/components/message-card'
+import { MessageLoading } from '@/components/message-loading'
 import { MarkdownContent } from '@/components/markdown-content'
 import { streamChat } from '@/lib/api'
-import { extractFilesFromContent } from '@/lib/extract-files'
-import { useCreateFragment, useMessages } from '@/hooks/use-api'
-import type { Message } from '@/types/api'
+import { useMessages } from '@/hooks/use-api'
+import type { Fragment } from '@/types/api'
 
 interface ChatPanelProps {
   projectId: string
+  activeFragment: Fragment | null
+  onFragmentSelect: (fragment: Fragment) => void
+  onPreviewReady?: () => void
 }
 
-export function ChatPanel({ projectId }: ChatPanelProps) {
+export function ChatPanel({ projectId, activeFragment, onFragmentSelect, onPreviewReady }: ChatPanelProps) {
   const queryClient = useQueryClient()
   const { data: messages = [], isLoading } = useMessages(projectId)
-  const createFragment = useCreateFragment(projectId)
+  const bottomRef = useRef<HTMLDivElement>(null)
   const [prompt, setPrompt] = useState('')
   const [streamingText, setStreamingText] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const displayMessages = useMemo(() => messages, [messages])
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages.length, streamingText, isStreaming])
+
+  useEffect(() => {
+    const latestFragment = [...messages]
+      .reverse()
+      .find((message) => message.role === 'ASSISTANT' && message.fragment)?.fragment
+
+    if (latestFragment) {
+      onPreviewReady?.()
+    }
+  }, [messages, onPreviewReady])
 
   async function handleSubmit() {
     const content = prompt.trim()
@@ -44,6 +58,7 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
           setStreamingText('')
           setIsStreaming(false)
           await queryClient.invalidateQueries({ queryKey: ['messages', projectId] })
+          onPreviewReady?.()
         },
         (message) => {
           setError(message)
@@ -57,84 +72,48 @@ export function ChatPanel({ projectId }: ChatPanelProps) {
     }
   }
 
-  async function handleSaveFragment(message: Message) {
-    const files = extractFilesFromContent(message.content)
-    await createFragment.mutateAsync({
-      messageId: message.id,
-      sandboxUrl: `https://preview.local/${projectId}/${message.id}`,
-      title: 'Generated App Preview',
-      files,
-    })
-  }
+  const lastMessage = messages.at(-1)
+  const showLoadingPlaceholder = isStreaming || (lastMessage?.role === 'USER' && isStreaming)
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-[var(--color-border)] px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-indigo-300" />
-          <p className="text-sm font-medium">AI Chat</p>
-          <Badge>Streaming</Badge>
-        </div>
-      </div>
-
-      <ScrollArea className="flex-1 px-4 py-4">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {isLoading && (
-          <div className="flex items-center gap-2 text-sm text-[var(--color-muted-foreground)]">
+          <div className="flex items-center gap-2 px-4 py-6 text-sm text-[var(--color-muted-foreground)]">
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading conversation...
           </div>
         )}
 
-        <div className="space-y-4">
-          {displayMessages.map((message) => (
-            <div
-              key={message.id}
-              className={`rounded-xl border px-4 py-3 ${
-                message.role === 'USER'
-                  ? 'border-[var(--color-border)] bg-[var(--color-card)]'
-                  : message.type === 'ERROR'
-                    ? 'border-red-900/50 bg-red-950/20'
-                    : 'border-indigo-900/40 bg-[var(--color-accent)]/40'
-              }`}
-            >
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <Badge>{message.role}</Badge>
-                {message.role === 'ASSISTANT' && !message.fragment && message.type === 'RESULT' && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={createFragment.isPending}
-                    onClick={() => void handleSaveFragment(message)}
-                  >
-                    <Save className="h-3.5 w-3.5" />
-                    Save preview
-                  </Button>
-                )}
-                {message.fragment && <Badge>Preview saved</Badge>}
-              </div>
-              <MarkdownContent content={message.content} />
-            </div>
-          ))}
+        {!isLoading && messages.length === 0 && !isStreaming && (
+          <div className="flex h-full items-center justify-center px-6 text-center text-sm text-[var(--color-muted-foreground)]">
+            No messages yet. Describe the app you want to build.
+          </div>
+        )}
 
-          {isStreaming && streamingText && (
-            <div className="rounded-xl border border-indigo-900/40 bg-[var(--color-accent)]/40 px-4 py-3">
-              <div className="mb-2">
-                <Badge>ASSISTANT</Badge>
-              </div>
+        {messages.map((message) => (
+          <MessageCard
+            key={message.id}
+            message={message}
+            activeFragmentId={activeFragment?.id ?? null}
+            onFragmentClick={onFragmentSelect}
+          />
+        ))}
+
+        {isStreaming && streamingText && (
+          <div className="px-2 pb-4">
+            <div className="pl-7">
               <MarkdownContent content={streamingText} />
             </div>
-          )}
+          </div>
+        )}
 
-          {isStreaming && !streamingText && (
-            <div className="flex items-center gap-2 text-sm text-[var(--color-muted-foreground)]">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Thinking...
-            </div>
-          )}
-        </div>
-      </ScrollArea>
+        {showLoadingPlaceholder && !streamingText && <MessageLoading />}
+        <div ref={bottomRef} />
+      </div>
 
-      <div className="border-t border-[var(--color-border)] p-4">
+      <div className="relative border-t border-[var(--color-border)] p-3">
+        <div className="pointer-events-none absolute -top-6 left-0 right-0 h-6 bg-gradient-to-b from-transparent to-[var(--color-background)]" />
         {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
         <div className="flex gap-2">
           <Textarea
