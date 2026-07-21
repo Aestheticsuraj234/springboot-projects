@@ -12,6 +12,40 @@ export type AuthResponse = {
   user: User;
 };
 
+export type Photo = {
+  id: string;
+  imagekitFileId: string;
+  fileName: string;
+  url: string;
+  thumbnailUrl: string | null;
+  mimeType: string | null;
+  sizeBytes: number;
+  width: number | null;
+  height: number | null;
+  status: "ACTIVE" | "ARCHIVED" | "TRASH";
+  createdAt: string;
+};
+
+export type PageResponse<T> = {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
+};
+
+export type CreatePhotoPayload = {
+  imagekitFileId: string;
+  fileName: string;
+  url: string;
+  thumbnailUrl?: string;
+  mimeType?: string;
+  sizeBytes: number;
+  width?: number;
+  height?: number;
+};
+
 export type ApiError = {
   timestamp: string;
   status: number;
@@ -47,7 +81,9 @@ async function request<T>(
   accessToken?: string | null,
 ): Promise<T> {
   const headers = new Headers(options.headers);
-  headers.set("Content-Type", "application/json");
+  if (!(options.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
   if (accessToken) {
     headers.set("Authorization", `Bearer ${accessToken}`);
   }
@@ -88,4 +124,19 @@ export const api = {
     }),
 
   me: (accessToken: string) => request<User>("/auth/me", {}, accessToken),
+
+  getPhotos: (accessToken: string, page = 0, size = 24) =>
+    request<PageResponse<Photo>>(`/photos?page=${page}&size=${size}`, {}, accessToken),
+
+  uploadPhoto: (accessToken: string, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request<Photo>("/photos/upload", { method: "POST", body: formData }, accessToken);
+  },
+
+  importPhoto: (accessToken: string, body: CreatePhotoPayload) =>
+    request<Photo>("/photos", { method: "POST", body: JSON.stringify(body) }, accessToken),
+
+  deletePhoto: (accessToken: string, photoId: string) =>
+    request<void>(`/photos/${photoId}`, { method: "DELETE" }, accessToken),
 };
