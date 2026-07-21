@@ -9,6 +9,13 @@ export const photoKeys = {
   all: ["photos"] as const,
   lists: () => [...photoKeys.all, "list"] as const,
   list: (status: PhotoStatus) => [...photoKeys.lists(), status] as const,
+  detail: (photoId: string) => [...photoKeys.all, "detail", photoId] as const,
+};
+
+export const libraryKeys = {
+  all: ["library"] as const,
+  storage: () => [...libraryKeys.all, "storage"] as const,
+  imagekitAssets: () => [...libraryKeys.all, "imagekit-assets"] as const,
 };
 
 export const albumKeys = {

@@ -14,6 +14,17 @@ export type AuthResponse = {
 
 export type PhotoStatus = "ACTIVE" | "ARCHIVED" | "TRASH";
 
+export type AiTransformType =
+  | "REMOVE_BACKGROUND"
+  | "BACKGROUND_AND_SHADOW"
+  | "CHANGE_BACKGROUND"
+  | "GENERATIVE_FILL"
+  | "SMART_CROP"
+  | "OBJECT_CROP"
+  | "RETOUCH"
+  | "UPSCALE"
+  | "AI_EDIT";
+
 export type Photo = {
   id: string;
   imagekitFileId: string;
@@ -27,6 +38,41 @@ export type Photo = {
   status: PhotoStatus;
   createdAt: string;
   deletedAt: string | null;
+  parentPhotoId: string | null;
+  aiTransformType: AiTransformType | null;
+};
+
+export type AiTransformRequest = {
+  type: AiTransformType;
+  prompt?: string;
+  width?: number;
+  height?: number;
+  focusObject?: string;
+};
+
+export type AiTransformPreviewResponse = {
+  previewUrl: string;
+  type: AiTransformType;
+  transformChain: string;
+};
+
+export type StorageUsageResponse = {
+  libraryUsedBytes: number;
+  libraryPhotoCount: number;
+  imagekitBandwidthBytes: number | null;
+  imagekitStorageBytes: number | null;
+};
+
+export type ImageKitAsset = {
+  fileId: string;
+  fileName: string;
+  url: string;
+  thumbnailUrl: string | null;
+  sizeBytes: number;
+  width: number | null;
+  height: number | null;
+  mimeType: string | null;
+  alreadyImported: boolean;
 };
 
 export type Album = {
@@ -138,6 +184,9 @@ export const api = {
 
   me: (accessToken: string) => request<User>("/auth/me", {}, accessToken),
 
+  getPhoto: (accessToken: string, photoId: string) =>
+    request<Photo>(`/photos/${photoId}`, {}, accessToken),
+
   getPhotos: (accessToken: string, status: PhotoStatus = "ACTIVE", page = 0, size = 24) =>
     request<PageResponse<Photo>>(
       `/photos?status=${status}&page=${page}&size=${size}`,
@@ -222,4 +271,31 @@ export const api = {
 
   removePhotoFromAlbum: (accessToken: string, albumId: string, photoId: string) =>
     request<void>(`/albums/${albumId}/photos/${photoId}`, { method: "DELETE" }, accessToken),
+
+  previewAiTransform: (accessToken: string, photoId: string, body: AiTransformRequest) =>
+    request<AiTransformPreviewResponse>(
+      `/photos/${photoId}/ai/preview`,
+      { method: "POST", body: JSON.stringify(body) },
+      accessToken,
+    ),
+
+  applyAiTransform: (accessToken: string, photoId: string, body: AiTransformRequest) =>
+    request<Photo>(
+      `/photos/${photoId}/ai/apply`,
+      { method: "POST", body: JSON.stringify(body) },
+      accessToken,
+    ),
+
+  getStorageUsage: (accessToken: string) =>
+    request<StorageUsageResponse>("/library/storage", {}, accessToken),
+
+  getImageKitAssets: (accessToken: string) =>
+    request<ImageKitAsset[]>("/library/imagekit-assets", {}, accessToken),
+
+  importImageKitAssets: (accessToken: string, imagekitFileIds: string[]) =>
+    request<Photo[]>(
+      "/library/import",
+      { method: "POST", body: JSON.stringify({ imagekitFileIds }) },
+      accessToken,
+    ),
 };

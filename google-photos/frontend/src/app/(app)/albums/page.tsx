@@ -18,10 +18,10 @@ export default function AlbumsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold text-foreground">Albums</h2>
-          <p className="text-sm text-muted-foreground">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground">Albums</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
             {albums.length > 0
               ? `${albums.length} album${albums.length === 1 ? "" : "s"}`
               : "Create albums to organize your photos"}

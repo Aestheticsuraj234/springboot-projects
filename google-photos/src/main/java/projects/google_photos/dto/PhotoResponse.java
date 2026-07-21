@@ -1,5 +1,6 @@
 package projects.google_photos.dto;
 
+import projects.google_photos.domain.AiTransformType;
 import projects.google_photos.domain.PhotoStatus;
 
 import java.time.Instant;
@@ -17,6 +18,8 @@ public record PhotoResponse(
         Integer height,
         PhotoStatus status,
         Instant createdAt,
-        Instant deletedAt
+        Instant deletedAt,
+        UUID parentPhotoId,
+        AiTransformType aiTransformType
 ) {
 }

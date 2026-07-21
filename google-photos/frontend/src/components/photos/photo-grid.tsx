@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import Image from "next/image";
-import { Check, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -32,7 +33,6 @@ export function PhotoGrid({
   const isSelectMode = usePhotoSelectionStore((state) => state.isSelectMode);
   const selectedIds = usePhotoSelectionStore((state) => state.selectedIds);
   const togglePhoto = usePhotoSelectionStore((state) => state.togglePhoto);
-  const enterSelectMode = usePhotoSelectionStore((state) => state.enterSelectMode);
 
   if (isLoading) {
     return (
@@ -71,29 +71,23 @@ export function PhotoGrid({
               <p className="truncate text-xs text-white">{photo.fileName}</p>
             </div>
 
-            {selectable && (
+            {!isSelectMode && !albumId && (
+              <Link
+                href={`/photos/${photo.id}`}
+                className="absolute inset-0 z-10"
+                aria-label={`Open ${photo.fileName}`}
+              />
+            )}
+
+            {selectable && isSelectMode && (
               <button
                 type="button"
-                className={cn(
-                  "absolute inset-0 z-10",
-                  !isSelectMode && "cursor-default",
-                )}
-                onClick={() => {
-                  if (!isSelectMode) {
-                    enterSelectMode();
-                  }
-                  togglePhoto(photo.id);
-                }}
+                className="absolute inset-0 z-10"
+                onClick={() => togglePhoto(photo.id)}
                 aria-label={`Select ${photo.fileName}`}
               >
                 <div className="absolute top-2 left-2">
-                  {isSelectMode ? (
-                    <Checkbox checked={isSelected} className="bg-background/90" />
-                  ) : (
-                    <span className="flex size-6 items-center justify-center rounded-full bg-background/80 opacity-0 transition-opacity group-hover:opacity-100">
-                      <Check className="size-3.5" />
-                    </span>
-                  )}
+                  <Checkbox checked={isSelected} className="bg-background/90" />
                 </div>
               </button>
             )}

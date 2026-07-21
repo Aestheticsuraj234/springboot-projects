@@ -50,7 +50,7 @@ export function PhotoUploadButton() {
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <>
       <input
         ref={inputRef}
         type="file"
@@ -75,18 +75,22 @@ export function PhotoUploadButton() {
       </Button>
 
       {uploads.length > 0 && (
-        <div className="space-y-2 rounded-xl border border-border/60 bg-card/50 p-3">
+        <div className="fixed bottom-4 right-4 z-50 w-[min(100vw-2rem,22rem)] space-y-3 rounded-2xl border border-border/70 bg-card/95 p-4 shadow-xl backdrop-blur-md">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <Upload className="size-4" />
+            Uploading {uploads.length} file{uploads.length === 1 ? "" : "s"}
+          </div>
           {uploads.map((upload) => (
-            <div key={upload.fileName} className="space-y-1">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <div key={upload.fileName} className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                 <span className="truncate">{upload.fileName}</span>
-                <span>{upload.progress}%</span>
+                <span className="shrink-0">{upload.progress}%</span>
               </div>
               <Progress value={upload.progress} />
             </div>
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }

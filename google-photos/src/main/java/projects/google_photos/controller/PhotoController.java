@@ -41,6 +41,15 @@ public class PhotoController {
         this.userService = userService;
     }
 
+    @GetMapping("/photos/{id}")
+    public ResponseEntity<PhotoResponse> getPhoto(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable UUID id
+    ) {
+        User user = userService.getByEmail(userDetails.getUsername());
+        return ResponseEntity.ok(photoService.getPhoto(user, id));
+    }
+
     @GetMapping("/photos")
     public ResponseEntity<PageResponse<PhotoResponse>> listPhotos(
             @AuthenticationPrincipal UserDetails userDetails,

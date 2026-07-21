@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import projects.google_photos.domain.AiTransformType;
 import projects.google_photos.domain.Photo;
 import projects.google_photos.domain.PhotoStatus;
 import projects.google_photos.domain.User;
@@ -46,6 +47,46 @@ public class PhotoService {
     public PageResponse<PhotoResponse> listPhotos(User user, PhotoStatus status, Pageable pageable) {
         Page<Photo> page = photoRepository.findByUserIdAndStatus(user.getId(), status, pageable);
         return toPageResponse(page);
+    }
+
+    @Transactional(readOnly = true)
+    public PhotoResponse getPhoto(User user, UUID photoId) {
+        Photo photo = photoRepository.findByIdAndUserId(photoId, user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Photo not found"));
+        return toPhotoResponse(photo);
+    }
+
+    @Transactional
+    public PhotoResponse createDerivedPhoto(
+            User user,
+            Photo sourcePhoto,
+            FileUploadResponse uploadResponse,
+            AiTransformType transformType
+    ) {
+        String fileId = uploadResponse.fileId()
+                .orElseThrow(() -> new BadRequestException("ImageKit did not return a file id"));
+        String url = uploadResponse.url()
+                .orElseThrow(() -> new BadRequestException("ImageKit did not return a file url"));
+
+        String thumbnailUrl = uploadResponse.thumbnailUrl()
+                .orElse(imageKitService.buildThumbnailUrlFromUrl(url));
+
+        Photo photo = Photo.builder()
+                .user(user)
+                .imagekitFileId(fileId)
+                .fileName(uploadResponse.name().orElse(sourcePhoto.getFileName()))
+                .url(url)
+                .thumbnailUrl(thumbnailUrl)
+                .mimeType(uploadResponse.fileType().orElse(sourcePhoto.getMimeType()))
+                .sizeBytes(uploadResponse.size().map(Double::longValue).orElse(0L))
+                .width(uploadResponse.width().map(Double::intValue).orElse(sourcePhoto.getWidth()))
+                .height(uploadResponse.height().map(Double::intValue).orElse(sourcePhoto.getHeight()))
+                .status(PhotoStatus.ACTIVE)
+                .parentPhotoId(sourcePhoto.getId())
+                .aiTransformType(transformType)
+                .build();
+
+        return toPhotoResponse(photoRepository.save(photo));
     }
 
     @Transactional
@@ -226,7 +267,9 @@ public class PhotoService {
                 photo.getHeight(),
                 photo.getStatus(),
                 photo.getCreatedAt(),
-                photo.getDeletedAt()
+                photo.getDeletedAt(),
+                photo.getParentPhotoId(),
+                photo.getAiTransformType()
         );
     }
 }

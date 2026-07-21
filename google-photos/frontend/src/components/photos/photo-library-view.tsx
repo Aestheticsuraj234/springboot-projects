@@ -1,6 +1,8 @@
 "use client";
 
-import { CheckSquare } from "lucide-react";
+import { useState } from "react";
+import { CheckSquare, CloudDownload } from "lucide-react";
+import { ImportImageKitDialog } from "@/components/library/import-imagekit-dialog";
 import { PhotoBulkToolbar } from "@/components/photos/photo-bulk-toolbar";
 import { PhotoGrid } from "@/components/photos/photo-grid";
 import { PhotoUploadButton } from "@/components/photos/photo-upload-button";
@@ -37,6 +39,7 @@ export function PhotoLibraryView({
   showUpload = false,
   showTrashAction = false,
 }: PhotoLibraryViewProps) {
+  const [importOpen, setImportOpen] = useState(false);
   const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = usePhotos(status);
   const isSelectMode = usePhotoSelectionStore((state) => state.isSelectMode);
   const enterSelectMode = usePhotoSelectionStore((state) => state.enterSelectMode);
@@ -48,17 +51,17 @@ export function PhotoLibraryView({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold text-foreground">{title}</h2>
-          <p className="text-sm text-muted-foreground">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
             {totalPhotos > 0
               ? `${totalPhotos} photo${totalPhotos === 1 ? "" : "s"}`
               : description}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           {photos.length > 0 && (
             <Button
               variant="outline"
@@ -69,8 +72,16 @@ export function PhotoLibraryView({
             </Button>
           )}
           {showUpload && <PhotoUploadButton />}
+          {showUpload && (
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
+              <CloudDownload className="size-4" />
+              Import from ImageKit
+            </Button>
+          )}
         </div>
       </div>
+
+      <ImportImageKitDialog open={importOpen} onOpenChange={setImportOpen} />
 
       <PhotoBulkToolbar photoIds={photoIds} context={status} />
 

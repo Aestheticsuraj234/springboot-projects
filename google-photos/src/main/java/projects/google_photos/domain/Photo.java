@@ -70,6 +70,13 @@ public class Photo {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    @Column(name = "parent_photo_id")
+    private UUID parentPhotoId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ai_transform_type", length = 50)
+    private AiTransformType aiTransformType;
+
     @PrePersist
     void onCreate() {
         if (createdAt == null) {
