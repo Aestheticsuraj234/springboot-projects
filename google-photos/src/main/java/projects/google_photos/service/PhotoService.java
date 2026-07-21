@@ -17,6 +17,8 @@ import projects.google_photos.exception.ResourceConflictException;
 import projects.google_photos.exception.ResourceNotFoundException;
 import projects.google_photos.repository.PhotoRepository;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -41,8 +43,8 @@ public class PhotoService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<PhotoResponse> listActivePhotos(User user, Pageable pageable) {
-        Page<Photo> page = photoRepository.findByUserIdAndStatus(user.getId(), PhotoStatus.ACTIVE, pageable);
+    public PageResponse<PhotoResponse> listPhotos(User user, PhotoStatus status, Pageable pageable) {
+        Page<Photo> page = photoRepository.findByUserIdAndStatus(user.getId(), status, pageable);
         return toPageResponse(page);
     }
 
@@ -109,12 +111,84 @@ public class PhotoService {
     }
 
     @Transactional
-    public void deletePhoto(User user, UUID photoId) {
-        Photo photo = photoRepository.findByIdAndUserId(photoId, user.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Photo not found"));
+    public void archivePhotos(User user, List<UUID> photoIds) {
+        updatePhotoStatus(user, photoIds, PhotoStatus.ACTIVE, PhotoStatus.ARCHIVED, false);
+    }
 
-        imageKitService.deleteFile(photo.getImagekitFileId());
-        photoRepository.delete(photo);
+    @Transactional
+    public void movePhotosToTrash(User user, List<UUID> photoIds) {
+        List<Photo> photos = loadOwnedPhotos(user, photoIds);
+
+        for (Photo photo : photos) {
+            if (photo.getStatus() == PhotoStatus.TRASH) {
+                continue;
+            }
+            photo.setStatus(PhotoStatus.TRASH);
+            photo.setDeletedAt(Instant.now());
+        }
+    }
+
+    @Transactional
+    public void restorePhotos(User user, List<UUID> photoIds) {
+        List<Photo> photos = photoRepository.findByIdInAndUserId(photoIds, user.getId());
+        if (photos.size() != photoIds.size()) {
+            throw new ResourceNotFoundException("One or more photos were not found");
+        }
+
+        for (Photo photo : photos) {
+            if (photo.getStatus() == PhotoStatus.ACTIVE) {
+                continue;
+            }
+            photo.setStatus(PhotoStatus.ACTIVE);
+            photo.setDeletedAt(null);
+        }
+    }
+
+    @Transactional
+    public void permanentlyDeletePhotos(User user, List<UUID> photoIds) {
+        List<Photo> photos = photoRepository.findByIdInAndUserId(photoIds, user.getId());
+        if (photos.size() != photoIds.size()) {
+            throw new ResourceNotFoundException("One or more photos were not found");
+        }
+
+        for (Photo photo : photos) {
+            if (photo.getStatus() != PhotoStatus.TRASH) {
+                throw new BadRequestException("Only photos in trash can be permanently deleted");
+            }
+            imageKitService.deleteFile(photo.getImagekitFileId());
+            photoRepository.delete(photo);
+        }
+    }
+
+    @Transactional
+    public void permanentlyDeletePhoto(User user, UUID photoId) {
+        permanentlyDeletePhotos(user, List.of(photoId));
+    }
+
+    private void updatePhotoStatus(
+            User user,
+            List<UUID> photoIds,
+            PhotoStatus requiredCurrentStatus,
+            PhotoStatus newStatus,
+            boolean setDeletedAt
+    ) {
+        List<Photo> photos = loadOwnedPhotos(user, photoIds);
+
+        for (Photo photo : photos) {
+            if (requiredCurrentStatus != null && photo.getStatus() != requiredCurrentStatus) {
+                throw new BadRequestException("Photo must be " + requiredCurrentStatus.name().toLowerCase());
+            }
+            photo.setStatus(newStatus);
+            photo.setDeletedAt(setDeletedAt ? Instant.now() : null);
+        }
+    }
+
+    private List<Photo> loadOwnedPhotos(User user, List<UUID> photoIds) {
+        List<Photo> photos = photoRepository.findByIdInAndUserId(photoIds, user.getId());
+        if (photos.size() != photoIds.size()) {
+            throw new ResourceNotFoundException("One or more photos were not found");
+        }
+        return photos;
     }
 
     private void validateUpload(MultipartFile file) {
@@ -139,7 +213,7 @@ public class PhotoService {
         );
     }
 
-    private PhotoResponse toPhotoResponse(Photo photo) {
+    public PhotoResponse toPhotoResponse(Photo photo) {
         return new PhotoResponse(
                 photo.getId(),
                 photo.getImagekitFileId(),
@@ -151,7 +225,8 @@ public class PhotoService {
                 photo.getWidth(),
                 photo.getHeight(),
                 photo.getStatus(),
-                photo.getCreatedAt()
+                photo.getCreatedAt(),
+                photo.getDeletedAt()
         );
     }
 }

@@ -18,7 +18,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import projects.google_photos.domain.PhotoStatus;
 import projects.google_photos.domain.User;
+import projects.google_photos.dto.BulkPhotoActionRequest;
 import projects.google_photos.dto.CreatePhotoRequest;
 import projects.google_photos.dto.PageResponse;
 import projects.google_photos.dto.PhotoResponse;
@@ -42,12 +44,14 @@ public class PhotoController {
     @GetMapping("/photos")
     public ResponseEntity<PageResponse<PhotoResponse>> listPhotos(
             @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(defaultValue = "ACTIVE") PhotoStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "24") int size
     ) {
         User user = userService.getByEmail(userDetails.getUsername());
-        PageResponse<PhotoResponse> photos = photoService.listActivePhotos(
+        PageResponse<PhotoResponse> photos = photoService.listPhotos(
                 user,
+                status,
                 PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
         );
         return ResponseEntity.ok(photos);
@@ -73,13 +77,53 @@ public class PhotoController {
         return ResponseEntity.status(HttpStatus.CREATED).body(photo);
     }
 
+    @PostMapping("/photos/archive")
+    public ResponseEntity<Void> archivePhotos(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody BulkPhotoActionRequest request
+    ) {
+        User user = userService.getByEmail(userDetails.getUsername());
+        photoService.archivePhotos(user, request.photoIds());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/photos/trash")
+    public ResponseEntity<Void> trashPhotos(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody BulkPhotoActionRequest request
+    ) {
+        User user = userService.getByEmail(userDetails.getUsername());
+        photoService.movePhotosToTrash(user, request.photoIds());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/photos/restore")
+    public ResponseEntity<Void> restorePhotos(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody BulkPhotoActionRequest request
+    ) {
+        User user = userService.getByEmail(userDetails.getUsername());
+        photoService.restorePhotos(user, request.photoIds());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/photos/delete-permanent")
+    public ResponseEntity<Void> permanentlyDeletePhotos(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody BulkPhotoActionRequest request
+    ) {
+        User user = userService.getByEmail(userDetails.getUsername());
+        photoService.permanentlyDeletePhotos(user, request.photoIds());
+        return ResponseEntity.noContent().build();
+    }
+
     @DeleteMapping("/photos/{id}")
     public ResponseEntity<Void> deletePhoto(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable UUID id
     ) {
         User user = userService.getByEmail(userDetails.getUsername());
-        photoService.deletePhoto(user, id);
+        photoService.permanentlyDeletePhoto(user, id);
         return ResponseEntity.noContent().build();
     }
 }

@@ -12,6 +12,8 @@ export type AuthResponse = {
   user: User;
 };
 
+export type PhotoStatus = "ACTIVE" | "ARCHIVED" | "TRASH";
+
 export type Photo = {
   id: string;
   imagekitFileId: string;
@@ -22,8 +24,19 @@ export type Photo = {
   sizeBytes: number;
   width: number | null;
   height: number | null;
-  status: "ACTIVE" | "ARCHIVED" | "TRASH";
+  status: PhotoStatus;
   createdAt: string;
+  deletedAt: string | null;
+};
+
+export type Album = {
+  id: string;
+  title: string;
+  coverPhotoId: string | null;
+  coverThumbnailUrl: string | null;
+  photoCount: number;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type PageResponse<T> = {
@@ -125,8 +138,12 @@ export const api = {
 
   me: (accessToken: string) => request<User>("/auth/me", {}, accessToken),
 
-  getPhotos: (accessToken: string, page = 0, size = 24) =>
-    request<PageResponse<Photo>>(`/photos?page=${page}&size=${size}`, {}, accessToken),
+  getPhotos: (accessToken: string, status: PhotoStatus = "ACTIVE", page = 0, size = 24) =>
+    request<PageResponse<Photo>>(
+      `/photos?status=${status}&page=${page}&size=${size}`,
+      {},
+      accessToken,
+    ),
 
   uploadPhoto: (accessToken: string, file: File) => {
     const formData = new FormData();
@@ -137,6 +154,72 @@ export const api = {
   importPhoto: (accessToken: string, body: CreatePhotoPayload) =>
     request<Photo>("/photos", { method: "POST", body: JSON.stringify(body) }, accessToken),
 
+  archivePhotos: (accessToken: string, photoIds: string[]) =>
+    request<void>(
+      "/photos/archive",
+      { method: "POST", body: JSON.stringify({ photoIds }) },
+      accessToken,
+    ),
+
+  trashPhotos: (accessToken: string, photoIds: string[]) =>
+    request<void>(
+      "/photos/trash",
+      { method: "POST", body: JSON.stringify({ photoIds }) },
+      accessToken,
+    ),
+
+  restorePhotos: (accessToken: string, photoIds: string[]) =>
+    request<void>(
+      "/photos/restore",
+      { method: "POST", body: JSON.stringify({ photoIds }) },
+      accessToken,
+    ),
+
+  permanentlyDeletePhotos: (accessToken: string, photoIds: string[]) =>
+    request<void>(
+      "/photos/delete-permanent",
+      { method: "POST", body: JSON.stringify({ photoIds }) },
+      accessToken,
+    ),
+
   deletePhoto: (accessToken: string, photoId: string) =>
     request<void>(`/photos/${photoId}`, { method: "DELETE" }, accessToken),
+
+  getAlbums: (accessToken: string) => request<Album[]>("/albums", {}, accessToken),
+
+  getAlbum: (accessToken: string, albumId: string) =>
+    request<Album>(`/albums/${albumId}`, {}, accessToken),
+
+  createAlbum: (accessToken: string, body: { title: string }) =>
+    request<Album>("/albums", { method: "POST", body: JSON.stringify(body) }, accessToken),
+
+  updateAlbum: (
+    accessToken: string,
+    albumId: string,
+    body: { title?: string; coverPhotoId?: string },
+  ) =>
+    request<Album>(`/albums/${albumId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }, accessToken),
+
+  deleteAlbum: (accessToken: string, albumId: string) =>
+    request<void>(`/albums/${albumId}`, { method: "DELETE" }, accessToken),
+
+  getAlbumPhotos: (accessToken: string, albumId: string, page = 0, size = 24) =>
+    request<PageResponse<Photo>>(
+      `/albums/${albumId}/photos?page=${page}&size=${size}`,
+      {},
+      accessToken,
+    ),
+
+  addPhotosToAlbum: (accessToken: string, albumId: string, photoIds: string[]) =>
+    request<void>(
+      `/albums/${albumId}/photos`,
+      { method: "POST", body: JSON.stringify({ photoIds }) },
+      accessToken,
+    ),
+
+  removePhotoFromAlbum: (accessToken: string, albumId: string, photoId: string) =>
+    request<void>(`/albums/${albumId}/photos/${photoId}`, { method: "DELETE" }, accessToken),
 };

@@ -16,6 +16,7 @@ public record PhotoResponse(
         Integer width,
         Integer height,
         PhotoStatus status,
-        Instant createdAt
+        Instant createdAt,
+        Instant deletedAt
 ) {
 }

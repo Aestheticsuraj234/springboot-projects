@@ -2,19 +2,20 @@
 
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ApiClientError, api } from "@/lib/api";
+import { ApiClientError, api, type PhotoStatus } from "@/lib/api";
 import { uploadPhotoFile } from "@/lib/photo-upload";
-import { photoKeys } from "@/lib/query-keys";
+import { albumKeys, photoKeys } from "@/lib/query-keys";
 import { useAuthStore } from "@/stores/auth-store";
+import { usePhotoSelectionStore } from "@/stores/photo-selection-store";
 
 const PAGE_SIZE = 24;
 
-export function usePhotos() {
+export function usePhotos(status: PhotoStatus = "ACTIVE") {
   const accessToken = useAuthStore((state) => state.accessToken);
 
   return useInfiniteQuery({
-    queryKey: photoKeys.lists(),
-    queryFn: ({ pageParam = 0 }) => api.getPhotos(accessToken!, pageParam, PAGE_SIZE),
+    queryKey: photoKeys.list(status),
+    queryFn: ({ pageParam = 0 }) => api.getPhotos(accessToken!, status, pageParam, PAGE_SIZE),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => (lastPage.last ? undefined : lastPage.page + 1),
     enabled: !!accessToken,
@@ -59,20 +60,57 @@ export function useUploadPhotos() {
   });
 }
 
-export function useDeletePhoto() {
+function usePhotoBulkMutation(
+  mutationFn: (photoIds: string[]) => Promise<void>,
+  successMessage: string,
+) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const queryClient = useQueryClient();
+  const exitSelectMode = usePhotoSelectionStore((state) => state.exitSelectMode);
 
   return useMutation({
-    mutationFn: (photoId: string) => api.deletePhoto(accessToken!, photoId),
-    onSuccess: () => {
+    mutationFn: (photoIds: string[]) => mutationFn(photoIds),
+    onSuccess: (_, photoIds) => {
       queryClient.invalidateQueries({ queryKey: photoKeys.all });
-      toast.success("Photo deleted");
+      queryClient.invalidateQueries({ queryKey: albumKeys.all });
+      exitSelectMode();
+      toast.success(photoIds.length === 1 ? successMessage : `${photoIds.length} ${successMessage}`);
     },
     onError: (error) => {
-      const message =
-        error instanceof ApiClientError ? error.message : "Failed to delete photo";
+      const message = error instanceof ApiClientError ? error.message : "Action failed";
       toast.error(message);
     },
   });
+}
+
+export function useArchivePhotos() {
+  const accessToken = useAuthStore((state) => state.accessToken);
+  return usePhotoBulkMutation(
+    (photoIds) => api.archivePhotos(accessToken!, photoIds),
+    "photos archived",
+  );
+}
+
+export function useTrashPhotos() {
+  const accessToken = useAuthStore((state) => state.accessToken);
+  return usePhotoBulkMutation(
+    (photoIds) => api.trashPhotos(accessToken!, photoIds),
+    "photos moved to trash",
+  );
+}
+
+export function useRestorePhotos() {
+  const accessToken = useAuthStore((state) => state.accessToken);
+  return usePhotoBulkMutation(
+    (photoIds) => api.restorePhotos(accessToken!, photoIds),
+    "photos restored",
+  );
+}
+
+export function usePermanentlyDeletePhotos() {
+  const accessToken = useAuthStore((state) => state.accessToken);
+  return usePhotoBulkMutation(
+    (photoIds) => api.permanentlyDeletePhotos(accessToken!, photoIds),
+    "photos permanently deleted",
+  );
 }
