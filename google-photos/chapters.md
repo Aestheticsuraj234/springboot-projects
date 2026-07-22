@@ -301,23 +301,3 @@ photos ──? photos (parent_photo_id for AI results)
 ### Frontend hooks
 `use-auth` · `use-photos` · `use-albums` · `use-library` · `use-ai`
 
----
-
-## Suggested recording order (recommended)
-
-| # | Chapter | Est. time |
-|---|---------|-----------|
-| 0 | Project tour & run setup | 3 min |
-| 1 | DB + domain | 8 min |
-| 2 | Auth full stack | 12 min |
-| 3 | Shell & routing | 5 min |
-| 4 | Photos lifecycle | 15 min |
-| 5 | Albums | 10 min |
-| 6 | Library / import / storage | 8 min |
-| 7 | AI transforms | 12 min |
-| 8 | Errors & patterns | 5 min |
-| 9 | Live E2E demo | 8 min |
-
----
-
-If you want this as a markdown file in the repo (e.g. `RECORDING_OUTLINE.md`) or rewritten as a **spoken script** with exact lines to say per file, say which and I’ll generate it.
