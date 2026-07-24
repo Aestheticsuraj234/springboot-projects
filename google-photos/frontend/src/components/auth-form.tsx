@@ -27,6 +27,8 @@ type AuthFormProps = {
 
 export function AuthForm({ mode }: AuthFormProps) {
   const isLogin = mode === "login";
+  const login = useLogin();
+  const registerUser = useRegister();
 
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -45,32 +47,19 @@ export function AuthForm({ mode }: AuthFormProps) {
     },
   });
 
-  const loginMutation = useLogin({
-    setFieldError: (field, message) =>
-      loginForm.setError(field as keyof LoginFormValues, { message }),
-  });
-
-  const registerMutation = useRegister({
-    setFieldError: (field, message) =>
-      registerForm.setError(field as keyof RegisterFormValues, { message }),
-  });
-
-  const pending = isLogin ? loginMutation.isPending : registerMutation.isPending;
-  const rootError = isLogin ? loginMutation.error : registerMutation.error;
-
-  function onLoginSubmit(values: LoginFormValues) {
-    loginMutation.mutate(values);
-  }
-
-  function onRegisterSubmit(values: RegisterFormValues) {
-    registerMutation.mutate(values);
-  }
+  const pending = isLogin ? login.isPending : registerUser.isPending;
+  const error = isLogin ? login.error : registerUser.error;
+  const errorMessage =
+    error instanceof Error ? error.message : isLogin ? "Unable to sign in" : "Unable to create account";
 
   if (isLogin) {
     const { register, handleSubmit, formState } = loginForm;
 
     return (
-      <form onSubmit={handleSubmit(onLoginSubmit)} className="space-y-6">
+      <form
+        onSubmit={handleSubmit((values) => login.mutate(values))}
+        className="space-y-6"
+      >
         <FieldGroup>
           <Field data-invalid={!!formState.errors.email}>
             <FieldLabel htmlFor="email">Email</FieldLabel>
@@ -99,11 +88,9 @@ export function AuthForm({ mode }: AuthFormProps) {
           </Field>
         </FieldGroup>
 
-        {rootError && (
+        {error && (
           <Alert variant="destructive">
-            <AlertDescription>
-              {rootError instanceof Error ? rootError.message : "Unable to sign in"}
-            </AlertDescription>
+            <AlertDescription>{errorMessage}</AlertDescription>
           </Alert>
         )}
 
@@ -131,7 +118,10 @@ export function AuthForm({ mode }: AuthFormProps) {
   const { register, handleSubmit, formState } = registerForm;
 
   return (
-    <form onSubmit={handleSubmit(onRegisterSubmit)} className="space-y-6">
+    <form
+      onSubmit={handleSubmit((values) => registerUser.mutate(values))}
+      className="space-y-6"
+    >
       <FieldGroup>
         <Field data-invalid={!!formState.errors.displayName}>
           <FieldLabel htmlFor="displayName">Display name</FieldLabel>
@@ -173,11 +163,9 @@ export function AuthForm({ mode }: AuthFormProps) {
         </Field>
       </FieldGroup>
 
-      {rootError && (
+      {error && (
         <Alert variant="destructive">
-          <AlertDescription>
-            {rootError instanceof Error ? rootError.message : "Unable to create account"}
-          </AlertDescription>
+          <AlertDescription>{errorMessage}</AlertDescription>
         </Alert>
       )}
 

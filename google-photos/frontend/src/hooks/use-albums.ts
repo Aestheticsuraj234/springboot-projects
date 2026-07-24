@@ -7,7 +7,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ApiClientError, api } from "@/lib/api";
+import { api } from "@/lib/api";
 import { albumKeys } from "@/lib/query-keys";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -18,7 +18,7 @@ export function useAlbums() {
 
   return useQuery({
     queryKey: albumKeys.lists(),
-    queryFn: () => api.getAlbums(accessToken!),
+    queryFn: () => api.getAlbums(),
     enabled: !!accessToken,
   });
 }
@@ -28,7 +28,7 @@ export function useAlbum(albumId: string) {
 
   return useQuery({
     queryKey: albumKeys.detail(albumId),
-    queryFn: () => api.getAlbum(accessToken!, albumId),
+    queryFn: () => api.getAlbum(albumId),
     enabled: !!accessToken && !!albumId,
   });
 }
@@ -38,8 +38,7 @@ export function useAlbumPhotos(albumId: string) {
 
   return useInfiniteQuery({
     queryKey: albumKeys.photos(albumId),
-    queryFn: ({ pageParam = 0 }) =>
-      api.getAlbumPhotos(accessToken!, albumId, pageParam, PAGE_SIZE),
+    queryFn: ({ pageParam = 0 }) => api.getAlbumPhotos(albumId, pageParam, PAGE_SIZE),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => (lastPage.last ? undefined : lastPage.page + 1),
     enabled: !!accessToken && !!albumId,
@@ -47,48 +46,41 @@ export function useAlbumPhotos(albumId: string) {
 }
 
 export function useCreateAlbum() {
-  const accessToken = useAuthStore((state) => state.accessToken);
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (title: string) => api.createAlbum(accessToken!, { title }),
+    mutationFn: (title: string) => api.createAlbum(title),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: albumKeys.all });
       toast.success("Album created");
     },
     onError: (error) => {
-      const message =
-        error instanceof ApiClientError ? error.message : "Failed to create album";
-      toast.error(message);
+      toast.error(error instanceof Error ? error.message : "Failed to create album");
     },
   });
 }
 
 export function useDeleteAlbum() {
-  const accessToken = useAuthStore((state) => state.accessToken);
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (albumId: string) => api.deleteAlbum(accessToken!, albumId),
+    mutationFn: (albumId: string) => api.deleteAlbum(albumId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: albumKeys.all });
       toast.success("Album deleted");
     },
     onError: (error) => {
-      const message =
-        error instanceof ApiClientError ? error.message : "Failed to delete album";
-      toast.error(message);
+      toast.error(error instanceof Error ? error.message : "Failed to delete album");
     },
   });
 }
 
 export function useAddPhotosToAlbum() {
-  const accessToken = useAuthStore((state) => state.accessToken);
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ albumId, photoIds }: { albumId: string; photoIds: string[] }) =>
-      api.addPhotosToAlbum(accessToken!, albumId, photoIds),
+      api.addPhotosToAlbum(albumId, photoIds),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: albumKeys.all });
       queryClient.invalidateQueries({ queryKey: albumKeys.detail(variables.albumId) });
@@ -96,19 +88,16 @@ export function useAddPhotosToAlbum() {
       toast.success("Photos added to album");
     },
     onError: (error) => {
-      const message =
-        error instanceof ApiClientError ? error.message : "Failed to add photos to album";
-      toast.error(message);
+      toast.error(error instanceof Error ? error.message : "Failed to add photos to album");
     },
   });
 }
 
 export function useRemovePhotoFromAlbum(albumId: string) {
-  const accessToken = useAuthStore((state) => state.accessToken);
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (photoId: string) => api.removePhotoFromAlbum(accessToken!, albumId, photoId),
+    mutationFn: (photoId: string) => api.removePhotoFromAlbum(albumId, photoId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: albumKeys.all });
       queryClient.invalidateQueries({ queryKey: albumKeys.detail(albumId) });
@@ -116,9 +105,7 @@ export function useRemovePhotoFromAlbum(albumId: string) {
       toast.success("Photo removed from album");
     },
     onError: (error) => {
-      const message =
-        error instanceof ApiClientError ? error.message : "Failed to remove photo from album";
-      toast.error(message);
+      toast.error(error instanceof Error ? error.message : "Failed to remove photo from album");
     },
   });
 }

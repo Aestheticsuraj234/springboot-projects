@@ -10,7 +10,7 @@ export function useStorageUsage() {
 
   return useQuery({
     queryKey: libraryKeys.storage(),
-    queryFn: () => api.getStorageUsage(accessToken!),
+    queryFn: () => api.getStorageUsage(),
     enabled: !!accessToken,
   });
 }
@@ -20,7 +20,7 @@ export function useImageKitAssets() {
 
   return useQuery({
     queryKey: libraryKeys.imagekitAssets(),
-    queryFn: () => api.getImageKitAssets(accessToken!),
+    queryFn: () => api.getImageKitAssets(),
     enabled: !!accessToken,
   });
 }

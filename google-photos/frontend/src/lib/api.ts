@@ -1,4 +1,8 @@
+import { useAuthStore } from "@/stores/auth-store";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api";
+
+// --- Types (match backend responses) ---
 
 export type User = {
   id: string;
@@ -94,208 +98,133 @@ export type PageResponse<T> = {
   last: boolean;
 };
 
-export type CreatePhotoPayload = {
-  imagekitFileId: string;
-  fileName: string;
-  url: string;
-  thumbnailUrl?: string;
-  mimeType?: string;
-  sizeBytes: number;
-  width?: number;
-  height?: number;
-};
-
-export type ApiError = {
-  timestamp: string;
-  status: number;
-  error: string;
-  message: string;
-  fieldErrors?: Record<string, string>;
-};
-
-export class ApiClientError extends Error {
-  status: number;
-  fieldErrors?: Record<string, string>;
-
-  constructor(message: string, status: number, fieldErrors?: Record<string, string>) {
-    super(message);
-    this.name = "ApiClientError";
-    this.status = status;
-    this.fieldErrors = fieldErrors;
-  }
-}
-
-async function parseError(response: Response): Promise<ApiClientError> {
-  try {
-    const body = (await response.json()) as ApiError;
-    return new ApiClientError(body.message ?? "Request failed", response.status, body.fieldErrors);
-  } catch {
-    return new ApiClientError("Request failed", response.status);
-  }
-}
+// --- Tiny fetch helper ---
 
 async function request<T>(
   path: string,
   options: RequestInit = {},
-  accessToken?: string | null,
+  auth = true,
 ): Promise<T> {
   const headers = new Headers(options.headers);
+
   if (!(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
-  if (accessToken) {
-    headers.set("Authorization", `Bearer ${accessToken}`);
+
+  if (auth) {
+    const token = useAuthStore.getState().accessToken;
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  const response = await fetch(`${API_URL}${path}`, { ...options, headers });
 
   if (!response.ok) {
-    throw await parseError(response);
+    // Try to read { message } from the backend; otherwise use a generic error
+    let message = "Request failed";
+    try {
+      const body = await response.json();
+      if (body?.message) message = body.message;
+    } catch {
+      // ignore JSON parse errors
+    }
+    throw new Error(message);
   }
 
   if (response.status === 204) {
     return undefined as T;
   }
 
-  return response.json() as Promise<T>;
+  return response.json();
 }
 
+// --- API methods ---
+
 export const api = {
+  // Auth (no token needed)
   register: (body: { email: string; password: string; displayName: string }) =>
-    request<AuthResponse>("/auth/register", { method: "POST", body: JSON.stringify(body) }),
+    request<AuthResponse>("/auth/register", { method: "POST", body: JSON.stringify(body) }, false),
 
   login: (body: { email: string; password: string }) =>
-    request<AuthResponse>("/auth/login", { method: "POST", body: JSON.stringify(body) }),
+    request<AuthResponse>("/auth/login", { method: "POST", body: JSON.stringify(body) }, false),
 
-  refresh: (refreshToken: string) =>
-    request<AuthResponse>("/auth/refresh", {
-      method: "POST",
-      body: JSON.stringify({ refreshToken }),
-    }),
-
-  logout: (refreshToken: string) =>
-    request<void>("/auth/logout", {
-      method: "POST",
-      body: JSON.stringify({ refreshToken }),
-    }),
-
-  me: (accessToken: string) => request<User>("/auth/me", {}, accessToken),
-
-  getPhoto: (accessToken: string, photoId: string) =>
-    request<Photo>(`/photos/${photoId}`, {}, accessToken),
-
-  getPhotos: (accessToken: string, status: PhotoStatus = "ACTIVE", page = 0, size = 24) =>
-    request<PageResponse<Photo>>(
-      `/photos?status=${status}&page=${page}&size=${size}`,
-      {},
-      accessToken,
-    ),
-
-  uploadPhoto: (accessToken: string, file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    return request<Photo>("/photos/upload", { method: "POST", body: formData }, accessToken);
+  logout: () => {
+    const refreshToken = useAuthStore.getState().refreshToken;
+    return request<void>(
+      "/auth/logout",
+      { method: "POST", body: JSON.stringify({ refreshToken }) },
+      false,
+    );
   },
 
-  importPhoto: (accessToken: string, body: CreatePhotoPayload) =>
-    request<Photo>("/photos", { method: "POST", body: JSON.stringify(body) }, accessToken),
+  me: () => request<User>("/auth/me"),
 
-  archivePhotos: (accessToken: string, photoIds: string[]) =>
-    request<void>(
-      "/photos/archive",
-      { method: "POST", body: JSON.stringify({ photoIds }) },
-      accessToken,
-    ),
+  // Photos
+  getPhoto: (photoId: string) => request<Photo>(`/photos/${photoId}`),
 
-  trashPhotos: (accessToken: string, photoIds: string[]) =>
-    request<void>(
-      "/photos/trash",
-      { method: "POST", body: JSON.stringify({ photoIds }) },
-      accessToken,
-    ),
+  getPhotos: (status: PhotoStatus = "ACTIVE", page = 0, size = 24) =>
+    request<PageResponse<Photo>>(`/photos?status=${status}&page=${page}&size=${size}`),
 
-  restorePhotos: (accessToken: string, photoIds: string[]) =>
-    request<void>(
-      "/photos/restore",
-      { method: "POST", body: JSON.stringify({ photoIds }) },
-      accessToken,
-    ),
+  archivePhotos: (photoIds: string[]) =>
+    request<void>("/photos/archive", { method: "POST", body: JSON.stringify({ photoIds }) }),
 
-  permanentlyDeletePhotos: (accessToken: string, photoIds: string[]) =>
-    request<void>(
-      "/photos/delete-permanent",
-      { method: "POST", body: JSON.stringify({ photoIds }) },
-      accessToken,
-    ),
+  trashPhotos: (photoIds: string[]) =>
+    request<void>("/photos/trash", { method: "POST", body: JSON.stringify({ photoIds }) }),
 
-  deletePhoto: (accessToken: string, photoId: string) =>
-    request<void>(`/photos/${photoId}`, { method: "DELETE" }, accessToken),
+  restorePhotos: (photoIds: string[]) =>
+    request<void>("/photos/restore", { method: "POST", body: JSON.stringify({ photoIds }) }),
 
-  getAlbums: (accessToken: string) => request<Album[]>("/albums", {}, accessToken),
+  permanentlyDeletePhotos: (photoIds: string[]) =>
+    request<void>("/photos/delete-permanent", {
+      method: "POST",
+      body: JSON.stringify({ photoIds }),
+    }),
 
-  getAlbum: (accessToken: string, albumId: string) =>
-    request<Album>(`/albums/${albumId}`, {}, accessToken),
+  // Albums
+  getAlbums: () => request<Album[]>("/albums"),
 
-  createAlbum: (accessToken: string, body: { title: string }) =>
-    request<Album>("/albums", { method: "POST", body: JSON.stringify(body) }, accessToken),
+  getAlbum: (albumId: string) => request<Album>(`/albums/${albumId}`),
 
-  updateAlbum: (
-    accessToken: string,
-    albumId: string,
-    body: { title?: string; coverPhotoId?: string },
-  ) =>
-    request<Album>(`/albums/${albumId}`, {
-      method: "PATCH",
+  createAlbum: (title: string) =>
+    request<Album>("/albums", { method: "POST", body: JSON.stringify({ title }) }),
+
+  deleteAlbum: (albumId: string) =>
+    request<void>(`/albums/${albumId}`, { method: "DELETE" }),
+
+  getAlbumPhotos: (albumId: string, page = 0, size = 24) =>
+    request<PageResponse<Photo>>(`/albums/${albumId}/photos?page=${page}&size=${size}`),
+
+  addPhotosToAlbum: (albumId: string, photoIds: string[]) =>
+    request<void>(`/albums/${albumId}/photos`, {
+      method: "POST",
+      body: JSON.stringify({ photoIds }),
+    }),
+
+  removePhotoFromAlbum: (albumId: string, photoId: string) =>
+    request<void>(`/albums/${albumId}/photos/${photoId}`, { method: "DELETE" }),
+
+  // AI
+  previewAiTransform: (photoId: string, body: AiTransformRequest) =>
+    request<AiTransformPreviewResponse>(`/photos/${photoId}/ai/preview`, {
+      method: "POST",
       body: JSON.stringify(body),
-    }, accessToken),
+    }),
 
-  deleteAlbum: (accessToken: string, albumId: string) =>
-    request<void>(`/albums/${albumId}`, { method: "DELETE" }, accessToken),
+  applyAiTransform: (photoId: string, body: AiTransformRequest) =>
+    request<Photo>(`/photos/${photoId}/ai/apply`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
-  getAlbumPhotos: (accessToken: string, albumId: string, page = 0, size = 24) =>
-    request<PageResponse<Photo>>(
-      `/albums/${albumId}/photos?page=${page}&size=${size}`,
-      {},
-      accessToken,
-    ),
+  // Library
+  getStorageUsage: () => request<StorageUsageResponse>("/library/storage"),
 
-  addPhotosToAlbum: (accessToken: string, albumId: string, photoIds: string[]) =>
-    request<void>(
-      `/albums/${albumId}/photos`,
-      { method: "POST", body: JSON.stringify({ photoIds }) },
-      accessToken,
-    ),
+  getImageKitAssets: () => request<ImageKitAsset[]>("/library/imagekit-assets"),
 
-  removePhotoFromAlbum: (accessToken: string, albumId: string, photoId: string) =>
-    request<void>(`/albums/${albumId}/photos/${photoId}`, { method: "DELETE" }, accessToken),
-
-  previewAiTransform: (accessToken: string, photoId: string, body: AiTransformRequest) =>
-    request<AiTransformPreviewResponse>(
-      `/photos/${photoId}/ai/preview`,
-      { method: "POST", body: JSON.stringify(body) },
-      accessToken,
-    ),
-
-  applyAiTransform: (accessToken: string, photoId: string, body: AiTransformRequest) =>
-    request<Photo>(
-      `/photos/${photoId}/ai/apply`,
-      { method: "POST", body: JSON.stringify(body) },
-      accessToken,
-    ),
-
-  getStorageUsage: (accessToken: string) =>
-    request<StorageUsageResponse>("/library/storage", {}, accessToken),
-
-  getImageKitAssets: (accessToken: string) =>
-    request<ImageKitAsset[]>("/library/imagekit-assets", {}, accessToken),
-
-  importImageKitAssets: (accessToken: string, imagekitFileIds: string[]) =>
-    request<Photo[]>(
-      "/library/import",
-      { method: "POST", body: JSON.stringify({ imagekitFileIds }) },
-      accessToken,
-    ),
+  importImageKitAssets: (imagekitFileIds: string[]) =>
+    request<Photo[]>("/library/import", {
+      method: "POST",
+      body: JSON.stringify({ imagekitFileIds }),
+    }),
 };

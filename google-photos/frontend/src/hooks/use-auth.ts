@@ -3,44 +3,27 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ApiClientError, api } from "@/lib/api";
+import { api } from "@/lib/api";
 import { authKeys } from "@/lib/query-keys";
 import type { LoginFormValues, RegisterFormValues } from "@/lib/validations/auth";
-import { selectIsAuthenticated, useAuthStore } from "@/stores/auth-store";
+import { useAuthStore } from "@/stores/auth-store";
 
-function handleAuthError(
-  error: unknown,
-  setFieldError?: (field: string, message: string) => void,
-) {
-  if (error instanceof ApiClientError) {
-    if (error.fieldErrors && setFieldError) {
-      Object.entries(error.fieldErrors).forEach(([field, message]) => {
-        setFieldError(field, message);
-      });
-    }
-    toast.error(error.message);
-    return;
-  }
-
-  toast.error("Something went wrong. Please try again.");
-}
-
+/** Current user from the API (only runs when logged in). */
 export function useCurrentUser() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const cachedUser = useAuthStore((state) => state.user);
 
   return useQuery({
     queryKey: authKeys.me(),
-    queryFn: () => api.me(accessToken!),
+    queryFn: () => api.me(),
     enabled: !!accessToken,
     initialData: cachedUser ?? undefined,
     staleTime: 5 * 60 * 1000,
   });
 }
 
-export function useLogin(options?: {
-  setFieldError?: (field: string, message: string) => void;
-}) {
+/** Login → save tokens → go to /photos */
+export function useLogin() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const setAuth = useAuthStore((state) => state.setAuth);
@@ -53,13 +36,11 @@ export function useLogin(options?: {
       toast.success(`Welcome back, ${data.user.displayName}`);
       router.replace("/photos");
     },
-    onError: (error) => handleAuthError(error, options?.setFieldError),
   });
 }
 
-export function useRegister(options?: {
-  setFieldError?: (field: string, message: string) => void;
-}) {
+/** Register → save tokens → go to /photos */
+export function useRegister() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const setAuth = useAuthStore((state) => state.setAuth);
@@ -72,22 +53,17 @@ export function useRegister(options?: {
       toast.success("Account created successfully");
       router.replace("/photos");
     },
-    onError: (error) => handleAuthError(error, options?.setFieldError),
   });
 }
 
+/** Logout → clear tokens → go to /login */
 export function useLogout() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const refreshToken = useAuthStore((state) => state.refreshToken);
   const clearAuth = useAuthStore((state) => state.clearAuth);
 
   return useMutation({
-    mutationFn: async () => {
-      if (refreshToken) {
-        await api.logout(refreshToken);
-      }
-    },
+    mutationFn: () => api.logout(),
     onSettled: () => {
       clearAuth();
       queryClient.removeQueries({ queryKey: authKeys.all });
@@ -97,12 +73,13 @@ export function useLogout() {
   });
 }
 
-export function useAuthSession() {
-  const hasHydrated = useAuthStore((state) => state.hasHydrated);
-  const isAuthenticated = useAuthStore(selectIsAuthenticated);
+/** Simple auth status for guards and redirects. */
+export function useAuth() {
+  const isReady = useAuthStore((state) => state.isReady);
+  const accessToken = useAuthStore((state) => state.accessToken);
 
   return {
-    hasHydrated,
-    isAuthenticated,
+    isReady,
+    isLoggedIn: !!accessToken,
   };
 }

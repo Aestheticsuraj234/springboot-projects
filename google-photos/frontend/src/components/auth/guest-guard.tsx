@@ -3,32 +3,25 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
-import { useAuthSession } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 
 type GuestGuardProps = {
   children: React.ReactNode;
   redirectTo?: string;
 };
 
+/** For login/register pages — redirect away if already logged in. */
 export function GuestGuard({ children, redirectTo = "/photos" }: GuestGuardProps) {
   const router = useRouter();
-  const { hasHydrated, isAuthenticated } = useAuthSession();
+  const { isReady, isLoggedIn } = useAuth();
 
   useEffect(() => {
-    if (hasHydrated && isAuthenticated) {
+    if (isReady && isLoggedIn) {
       router.replace(redirectTo);
     }
-  }, [hasHydrated, isAuthenticated, redirectTo, router]);
+  }, [isReady, isLoggedIn, redirectTo, router]);
 
-  if (!hasHydrated) {
-    return (
-      <div className="flex min-h-full items-center justify-center bg-background text-muted-foreground">
-        <Spinner className="size-6" />
-      </div>
-    );
-  }
-
-  if (isAuthenticated) {
+  if (!isReady || isLoggedIn) {
     return (
       <div className="flex min-h-full items-center justify-center bg-background text-muted-foreground">
         <Spinner className="size-6" />

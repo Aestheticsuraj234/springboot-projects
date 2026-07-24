@@ -2,7 +2,7 @@
 
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ApiClientError, api, type PhotoStatus } from "@/lib/api";
+import { api, type PhotoStatus } from "@/lib/api";
 import { uploadPhotoFile } from "@/lib/photo-upload";
 import { albumKeys, photoKeys } from "@/lib/query-keys";
 import { useAuthStore } from "@/stores/auth-store";
@@ -15,7 +15,7 @@ export function usePhotos(status: PhotoStatus = "ACTIVE") {
 
   return useInfiniteQuery({
     queryKey: photoKeys.list(status),
-    queryFn: ({ pageParam = 0 }) => api.getPhotos(accessToken!, status, pageParam, PAGE_SIZE),
+    queryFn: ({ pageParam = 0 }) => api.getPhotos(status, pageParam, PAGE_SIZE),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => (lastPage.last ? undefined : lastPage.page + 1),
     enabled: !!accessToken,
@@ -49,13 +49,7 @@ export function useUploadPhotos() {
       );
     },
     onError: (error) => {
-      const message =
-        error instanceof ApiClientError
-          ? error.message
-          : error instanceof Error
-            ? error.message
-            : "Upload failed";
-      toast.error(message);
+      toast.error(error instanceof Error ? error.message : "Upload failed");
     },
   });
 }
@@ -64,12 +58,11 @@ function usePhotoBulkMutation(
   mutationFn: (photoIds: string[]) => Promise<void>,
   successMessage: string,
 ) {
-  const accessToken = useAuthStore((state) => state.accessToken);
   const queryClient = useQueryClient();
   const exitSelectMode = usePhotoSelectionStore((state) => state.exitSelectMode);
 
   return useMutation({
-    mutationFn: (photoIds: string[]) => mutationFn(photoIds),
+    mutationFn,
     onSuccess: (_, photoIds) => {
       queryClient.invalidateQueries({ queryKey: photoKeys.all });
       queryClient.invalidateQueries({ queryKey: albumKeys.all });
@@ -77,40 +70,23 @@ function usePhotoBulkMutation(
       toast.success(photoIds.length === 1 ? successMessage : `${photoIds.length} ${successMessage}`);
     },
     onError: (error) => {
-      const message = error instanceof ApiClientError ? error.message : "Action failed";
-      toast.error(message);
+      toast.error(error instanceof Error ? error.message : "Action failed");
     },
   });
 }
 
 export function useArchivePhotos() {
-  const accessToken = useAuthStore((state) => state.accessToken);
-  return usePhotoBulkMutation(
-    (photoIds) => api.archivePhotos(accessToken!, photoIds),
-    "photos archived",
-  );
+  return usePhotoBulkMutation(api.archivePhotos, "photos archived");
 }
 
 export function useTrashPhotos() {
-  const accessToken = useAuthStore((state) => state.accessToken);
-  return usePhotoBulkMutation(
-    (photoIds) => api.trashPhotos(accessToken!, photoIds),
-    "photos moved to trash",
-  );
+  return usePhotoBulkMutation(api.trashPhotos, "photos moved to trash");
 }
 
 export function useRestorePhotos() {
-  const accessToken = useAuthStore((state) => state.accessToken);
-  return usePhotoBulkMutation(
-    (photoIds) => api.restorePhotos(accessToken!, photoIds),
-    "photos restored",
-  );
+  return usePhotoBulkMutation(api.restorePhotos, "photos restored");
 }
 
 export function usePermanentlyDeletePhotos() {
-  const accessToken = useAuthStore((state) => state.accessToken);
-  return usePhotoBulkMutation(
-    (photoIds) => api.permanentlyDeletePhotos(accessToken!, photoIds),
-    "photos permanently deleted",
-  );
+  return usePhotoBulkMutation(api.permanentlyDeletePhotos, "photos permanently deleted");
 }

@@ -4,14 +4,18 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { AuthResponse, User } from "@/lib/api";
 
+/**
+ * Stores the logged-in user + tokens.
+ * `persist` saves them in localStorage so a page refresh keeps you logged in.
+ * `isReady` becomes true after that saved data has been loaded.
+ */
 type AuthState = {
   accessToken: string | null;
   refreshToken: string | null;
   user: User | null;
-  hasHydrated: boolean;
+  isReady: boolean;
   setAuth: (auth: AuthResponse) => void;
   clearAuth: () => void;
-  setHasHydrated: (value: boolean) => void;
 };
 
 export const useAuthStore = create<AuthState>()(
@@ -20,7 +24,7 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       user: null,
-      hasHydrated: false,
+      isReady: false,
       setAuth: (auth) =>
         set({
           accessToken: auth.accessToken,
@@ -33,22 +37,18 @@ export const useAuthStore = create<AuthState>()(
           refreshToken: null,
           user: null,
         }),
-      setHasHydrated: (value) => set({ hasHydrated: value }),
     }),
     {
       name: "gp-auth",
+      // Only save these fields (not isReady)
       partialize: (state) => ({
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,
         user: state.user,
       }),
-      onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true);
+      onRehydrateStorage: () => () => {
+        useAuthStore.setState({ isReady: true });
       },
     },
   ),
 );
-
-export function selectIsAuthenticated(state: AuthState) {
-  return !!state.accessToken;
-}

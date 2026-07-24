@@ -3,16 +3,16 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
-import { useAuthSession } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function HomePage() {
   const router = useRouter();
-  const { hasHydrated, isAuthenticated } = useAuthSession();
+  const { isReady, isLoggedIn } = useAuth();
 
   useEffect(() => {
-    if (!hasHydrated) return;
-    router.replace(isAuthenticated ? "/photos" : "/login");
-  }, [hasHydrated, isAuthenticated, router]);
+    if (!isReady) return;
+    router.replace(isLoggedIn ? "/photos" : "/login");
+  }, [isReady, isLoggedIn, router]);
 
   return (
     <div className="flex min-h-full items-center justify-center bg-background text-muted-foreground">

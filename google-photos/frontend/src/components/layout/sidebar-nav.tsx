@@ -100,7 +100,7 @@ export function SidebarNav({ user, onNavigate }: SidebarNavProps) {
             <>
               <LogOut className="size-4 shrink-0" />
               Sign out
-            </>
+          </>
           )}
         </button>
       </div>

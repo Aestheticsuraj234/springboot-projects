@@ -3,25 +3,26 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
-import { useAuthSession, useCurrentUser } from "@/hooks/use-auth";
+import { useAuth, useCurrentUser } from "@/hooks/use-auth";
 
 type AuthGuardProps = {
   children: React.ReactNode;
   redirectTo?: string;
 };
 
+/** Protects pages that require login. */
 export function AuthGuard({ children, redirectTo = "/login" }: AuthGuardProps) {
   const router = useRouter();
-  const { hasHydrated, isAuthenticated } = useAuthSession();
+  const { isReady, isLoggedIn } = useAuth();
   const { isLoading } = useCurrentUser();
 
   useEffect(() => {
-    if (hasHydrated && !isAuthenticated) {
+    if (isReady && !isLoggedIn) {
       router.replace(redirectTo);
     }
-  }, [hasHydrated, isAuthenticated, redirectTo, router]);
+  }, [isReady, isLoggedIn, redirectTo, router]);
 
-  if (!hasHydrated || !isAuthenticated || isLoading) {
+  if (!isReady || !isLoggedIn || isLoading) {
     return (
       <div className="flex min-h-full items-center justify-center bg-background text-muted-foreground">
         <Spinner className="size-6" />
